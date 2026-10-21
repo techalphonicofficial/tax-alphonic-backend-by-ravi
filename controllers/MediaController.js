@@ -26,12 +26,27 @@ class MediaController {
         return errorResponse(res, 'No files uploaded', [], 400);
       }
       
+      // Each file on its own: one bad file no longer fails (or hides) the ones already saved.
+      // data = the saved files, errors = [{ field: <file name>, message }] for the rest.
       const mediaItems = [];
+      const errors = [];
       for (const file of req.files) {
-        const media = await MediaService.processAndUpload(file, req.body);
-        mediaItems.push(media);
+        try {
+          mediaItems.push(await MediaService.processAndUpload(file, req.body));
+        } catch (error) {
+          logger.error(`Upload Bulk Media Error (${file.originalname}): ${error.message}`);
+          errors.push({ field: file.originalname, message: error.message });
+        }
       }
-      return successResponse(res, 'Bulk media uploaded successfully', mediaItems, null, 201);
+      if (!mediaItems.length) {
+        return errorResponse(res, errors.length === 1 ? `${errors[0].field}: ${errors[0].message}` : 'None of the files could be uploaded', errors, 422);
+      }
+      return res.status(201).json({
+        success: true,
+        message: errors.length ? `Uploaded ${mediaItems.length} of ${req.files.length} files` : 'Bulk media uploaded successfully',
+        data: mediaItems,
+        errors,
+      });
     } catch (error) {
       logger.error(`Upload Bulk Media Error: ${error.message}`);
       return errorResponse(res, error.message);
