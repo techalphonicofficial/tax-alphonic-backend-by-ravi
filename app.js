@@ -23,14 +23,14 @@ app.use(helmet({
 app.use(cors({ origin: '*', credentials: true })); // Update origin in production
 
 // Rate Limiter
-const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === 'production' ? 100 : 5000, // Increase limit drastically for development and testing
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes.' }
-});
-app.use('/api/', apiLimiter);
+// const apiLimiter = rateLimit({
+//     windowMs: 15 * 60 * 1000, // 15 minutes
+//     max: process.env.NODE_ENV === 'production' ? 100 : 5000, // Increase limit drastically for development and testing
+//     standardHeaders: true,
+//     legacyHeaders: false,
+//     message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes.' }
+// });
+// app.use('/api/', apiLimiter);
 
 // Serve static files (like uploads)
 app.use('/uploads', express.static(require('path').join(__dirname, 'uploads'), {

@@ -7,9 +7,10 @@ REST API for the Tax Alphonic CMS. It serves two clients:
 ## Stack and commands
 - Express 5, Sequelize 6 + MySQL (`mysql2`), JWT, multer + sharp (uploads), nodemailer, winston, Swagger.
 - `npm run dev` (nodemon `server.js`, port 5000). Not a git repo. No tests.
-- Migrations: `npx sequelize-cli db:migrate` (`.sequelizerc` points to `config/config.json`, `migrations/`, `seeders/`). `sequelize.sync` is commented out in `server.js`, so schema changes need a migration.
+- Migrations: `npx sequelize-cli db:migrate` (`.sequelizerc` points to `config/config.js`, `migrations/`, `seeders/`). `sequelize.sync` is commented out in `server.js`, so schema changes need a migration.
+- The DB server (MariaDB on Linux, `lower_case_table_names=0`) is case-sensitive and every table name is lowercase. Give every model an explicit lowercase `tableName` (Sequelize otherwise uses e.g. `Industries`). Migrations use lowercase names too, and sequelize-cli keeps its history in `sequelizemeta` (`migrationStorageTableName` in `config/config.js`).
 - Swagger UI is at `/api-docs` (spec in `docs/swagger.js`). Uploads are served from `/uploads`.
-- `.env`: PORT, DB_*, JWT_*, GEMINI_API_KEY. Never print or commit it.
+- `.env`: PORT, DB_* (DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME, optional DB_DIALECT), JWT_*, GEMINI_API_KEY. Never print or commit it. `config/config.js` builds the DB connection from DB_* for the app and sequelize-cli (same values in every NODE_ENV); there is no config.json.
 
 ## Layout
 `routes/index.js` (mounted at `/api/v1`) → `routes/*Routes.js` → `controllers/` → `services/` (business logic, extend `BaseService`) → `repositories/` (extend `BaseRepository`) → `models/` (Sequelize, `models/index.js`).

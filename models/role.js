@@ -5,7 +5,7 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       Role.hasMany(models.User, { foreignKey: 'roleId', as: 'users' });
       Role.belongsToMany(models.Permission, {
-        through: 'RolePermissions',
+        through: 'rolepermissions',
         as: 'permissions',
         foreignKey: 'roleId'
       });

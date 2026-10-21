@@ -31,6 +31,7 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'Location',
+    tableName: 'locations',
     paranoid: true,
   });
   return Location;
