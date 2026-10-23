@@ -14,6 +14,7 @@ const MODULE_LABELS = {
   Form: 'Forms',
   Industry: 'Industries',
   Inquiry: 'Inquiries',
+  LandingPage: 'Landing Pages',
   Location: 'Locations',
   Media: 'Media',
   MediaCategory: 'Media Categories',
@@ -45,7 +46,7 @@ const MODULE_LABELS = {
 const RECORD_NOUNS = {
   AboutPage: 'about page', Banner: 'banner', Blog: 'blog', BlogComment: 'blog comment', BlogAuthor: 'blog author',
   BlogCategory: 'blog category', BlogTag: 'blog tag', Branch: 'branch', Country: 'country',
-  Faq: 'FAQ', Form: 'form', Industry: 'industry', Inquiry: 'inquiry', Location: 'location',
+  Faq: 'FAQ', Form: 'form', Industry: 'industry', Inquiry: 'inquiry', LandingPage: 'landing page', Location: 'location',
   Media: 'media file', MediaCategory: 'media category', MediaFolder: 'media folder', Menu: 'menu',
   Package: 'package', Page: 'page', PageCategory: 'page category', Partner: 'partner',
   Permission: 'permission', PortfolioCategory: 'portfolio category', PortfolioItem: 'portfolio item',

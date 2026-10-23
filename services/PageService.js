@@ -1,13 +1,48 @@
+const { Op } = require('sequelize');
 const BaseService = require('./BaseService');
 const PageRepository = require('../repositories/PageRepository');
 const SectionHydrator = require('./SectionHydrator');
+
+// Draft pages behind Landing Pages (LandingPageService): edited and published only through
+// /landing-pages, so the normal page list, public routes, publish and delete leave them alone.
+const LANDING_PREFIX = 'landing-page/';
+const isLandingSlug = (slug) => String(slug || '').startsWith(LANDING_PREFIX);
 
 class PageService extends BaseService {
   constructor() {
     super(PageRepository);
   }
 
+  /** Normal pages only (landing page drafts hidden). */
+  async getAll(reqQuery = {}, options = {}) {
+    const hide = { slug: { [Op.notLike]: `${LANDING_PREFIX}%` } };
+    const repository = this.repository;
+    const filtered = { findAndCountAll: (query) => repository.findAndCountAll({ ...query, where: { [Op.and]: [query.where || {}, hide] } }) };
+    return BaseService.prototype.getAll.call({ repository: filtered }, reqQuery, options);
+  }
+
+  async update(id, data, transaction = null) {
+    const page = await this.repository.findById(id);
+    if (page && isLandingSlug(page.slug)) {
+      throw new Error('This page belongs to a Landing Page. Edit, publish or archive it under Landing Pages.');
+    }
+    if (data && isLandingSlug(data.slug)) throw new Error(`Slugs starting with "${LANDING_PREFIX}" are reserved for Landing Pages`);
+    return super.update(id, data, transaction);
+  }
+
+  async create(data, transaction = null) {
+    if (data && isLandingSlug(data.slug)) throw new Error(`Slugs starting with "${LANDING_PREFIX}" are reserved for Landing Pages`);
+    return super.create(data, transaction);
+  }
+
+  async delete(id, transaction = null) {
+    const page = await this.repository.findById(id);
+    if (page && isLandingSlug(page.slug)) throw new Error('This page belongs to a Landing Page. Archive the landing page instead.');
+    return super.delete(id, transaction);
+  }
+
   async getBySlug(slug) {
+    if (isLandingSlug(slug)) throw new Error('Page not found');
     const page = await this.repository.findOne({ where: { slug, status: 'published' } });
     if (!page) throw new Error('Page not found');
     const data = page.toJSON();

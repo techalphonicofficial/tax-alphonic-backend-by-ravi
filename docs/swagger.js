@@ -11,6 +11,7 @@ const routeModules = {
   auditLogRoutes: 'audit-logs',
   profileRoutes: 'profile',
   pageRoutes: 'pages',
+  landingPageRoutes: 'landing-pages',
   serviceCategoryRoutes: 'service-categories',
   serviceRoutes: 'services',
   portfolioCategoryRoutes: 'portfolio-categories',
@@ -121,7 +122,8 @@ function buildPaths() {
       const line = source.slice(match.index, lineEnd === -1 ? source.length : lineEnd);
       const endpoint = `/api/v1/${segment}${routePath === '/' ? '' : routePath}`
         .replace(/:([A-Za-z0-9_]+)/g, '{$1}');
-      const isProtected = line.includes('verifyToken') ||
+      // requirePermission(...) / can(...) (landing pages) include verifyToken.
+      const isProtected = line.includes('verifyToken') || line.includes('requirePermission') || /\bcan\(/.test(line) ||
         (protectedFrom !== -1 && match.index > protectedFrom);
       const parameters = [...endpoint.matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(([, name]) => ({
         name,

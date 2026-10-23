@@ -40,6 +40,8 @@ router.use('/permissions', permissionRoutes);
 router.use('/audit-logs', auditLogRoutes);
 router.use('/profile', profileRoutes);
 router.use('/pages', pageRoutes);
+// Landing pages on subdomains (<slug>.taxalphonic.com)
+router.use('/landing-pages', require('./landingPageRoutes'));
 router.use('/service-categories', serviceCategoryRoutes);
 router.use('/services', serviceRoutes);
 router.use('/portfolio-categories', portfolioCategoryRoutes);

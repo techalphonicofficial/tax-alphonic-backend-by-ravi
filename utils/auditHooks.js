@@ -14,6 +14,8 @@ const EXCLUDED_MODELS = new Set([
   'AuditLog', 'LoginActivity', 'PasswordResetToken', 'MediaAuditLog', 'MediaUsage',
   'ServiceSection', 'ServiceSectionData', 'SectionType', 'MenuItem', 'RolePermission',
   'Setting', 'BlogFaq', 'AiSetting', 'BlogLike',
+  // Published snapshots: the publish itself is logged as a Landing Page update.
+  'LandingPageVersion',
 ]);
 
 // Public form/contact submissions create Inquiries: CRM data, not a site change
