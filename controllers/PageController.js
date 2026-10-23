@@ -33,6 +33,28 @@ class PageController {
     }
   }
 
+  // Public: the Journey Stage pages (see PageService.getJourneyStages).
+  async getJourneyStages(req, res) {
+    try {
+      const stages = await PageService.getJourneyStages();
+      return successResponse(res, 'Journey stages retrieved successfully', stages);
+    } catch (error) {
+      logger.error(`Get Journey Stages Error: ${error.message}`);
+      return errorResponse(res, error.message, [], 500);
+    }
+  }
+
+  // Public: the free tool pages (see PageService.getTools).
+  async getTools(req, res) {
+    try {
+      const tools = await PageService.getTools();
+      return successResponse(res, 'Tools retrieved successfully', tools);
+    } catch (error) {
+      logger.error(`Get Tools Error: ${error.message}`);
+      return errorResponse(res, error.message, [], 500);
+    }
+  }
+
   async getPageBySlug(req, res) {
     try {
       const page = await PageService.getBySlug(req.params.slug);

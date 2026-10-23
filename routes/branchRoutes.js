@@ -1,16 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const BranchController = require('../controllers/BranchController');
-const { verifyToken, checkPermission } = require('../middlewares/auth');
+const { verifyToken, checkPermission, publicRead } = require('../middlewares/auth');
 
-// Public read endpoints for website
-router.get('/', BranchController.getAll);
-router.get('/:id', BranchController.getById);
+// Admin sidebar module, or the specific one: either permission is enough.
+const MODULE = ['CMS', 'Branches'];
 
-// Protected admin mutation endpoints
+// The website lists them without a login: only active ones (publicRead).
+router.get('/', publicRead(MODULE, 'active'), BranchController.getAll);
+
+// Everything else needs a login.
 router.use(verifyToken);
-router.post('/', checkPermission('create', 'Branches'), BranchController.create);
-router.put('/:id', checkPermission('update', 'Branches'), BranchController.update);
-router.delete('/:id', checkPermission('delete', 'Branches'), BranchController.delete);
+router.get('/:id', checkPermission('read', MODULE), BranchController.getById);
+
+router.post('/', checkPermission('create', MODULE), BranchController.create);
+router.put('/:id', checkPermission('update', MODULE), BranchController.update);
+router.delete('/:id', checkPermission('delete', MODULE), BranchController.delete);
 
 module.exports = router;

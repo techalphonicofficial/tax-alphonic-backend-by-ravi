@@ -271,7 +271,8 @@ class FormService extends BaseService {
       }
       return sec;
     });
-    const isFormBlock = (sec) => sec?.type?.componentKey === FORM_BLOCK_TYPE;
+    // Form blocks, plus any other block that picks a form (homepage blocks placed on a service page).
+    const isFormBlock = (sec) => sec?.type?.componentKey === FORM_BLOCK_TYPE || Boolean(sec?.data?.payload?.formId);
 
     const formsById = await this._loadForms(sections.filter(isFormBlock).map(sec => sec.data?.payload?.formId));
     if (!formsById) return { ...service, sections };

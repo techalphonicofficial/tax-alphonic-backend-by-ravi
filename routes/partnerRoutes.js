@@ -1,17 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const PartnerController = require('../controllers/PartnerController');
-const { verifyToken, checkPermission } = require('../middlewares/auth');
+const { verifyToken, checkPermission, publicRead } = require('../middlewares/auth');
+
+// Admin sidebar module, or the specific one: either permission is enough.
+const MODULE = ['CMS', 'Partners'];
 const upload = require('../middlewares/upload');
 
-// Public read endpoints for website
-router.get('/', PartnerController.getAll);
-router.get('/:id', PartnerController.getById);
+// The website lists them without a login: only active ones (publicRead).
+router.get('/', publicRead(MODULE, 'active'), PartnerController.getAll);
 
-// Protected admin mutation endpoints
+// Everything else needs a login.
 router.use(verifyToken);
-router.post('/', checkPermission('create', 'Partners'), upload.single('logo'), PartnerController.create);
-router.put('/:id', checkPermission('update', 'Partners'), upload.single('logo'), PartnerController.update);
-router.delete('/:id', checkPermission('delete', 'Partners'), PartnerController.delete);
+router.get('/:id', checkPermission('read', MODULE), PartnerController.getById);
+
+router.post('/', checkPermission('create', MODULE), upload.single('logo'), PartnerController.create);
+router.put('/:id', checkPermission('update', MODULE), upload.single('logo'), PartnerController.update);
+router.delete('/:id', checkPermission('delete', MODULE), PartnerController.delete);
 
 module.exports = router;
