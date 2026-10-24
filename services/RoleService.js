@@ -12,6 +12,15 @@ class RoleService extends BaseService {
     return await this.repository.findByName(name);
   }
 
+  // GET /roles/:id must include the permissions: the admin Role form ticks them from this, and
+  // saving the form replaces the role's permissions with the ticked ones (without them a save
+  // used to remove every permission of the role).
+  async getById(id) {
+    const record = await this.repository.findByIdWithPermissions(id);
+    if (!record) throw new Error('Record not found');
+    return record;
+  }
+
   async assignPermissions(roleId, permissionIds) {
     const role = await this.repository.findById(roleId);
     if (!role) {

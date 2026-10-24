@@ -17,6 +17,23 @@ const BAD_SCHEME = /^\s*(javascript|vbscript|data:text\/html)\s*:?/i;
 
 const isObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+// Button / link URLs that open a CMS form in a popup on the website (lib/formPopup.js there):
+// "#form-<form id>" = that form, "#form" = the page's own form (first Form block).
+const POPUP_URL = /^#form(?:-([A-Za-z0-9_-]{1,64}))?$/;
+
+/** Form ids of the popup URLs in a payload ("" = the page's own form). */
+function popupForms(value, out = []) {
+  if (typeof value === 'string') {
+    const match = POPUP_URL.exec(value.trim());
+    if (match) out.push(match[1] || '');
+  } else if (Array.isArray(value)) {
+    value.forEach((item) => popupForms(item, out));
+  } else if (isObject(value)) {
+    Object.values(value).forEach((item) => popupForms(item, out));
+  }
+  return out;
+}
+
 /** A block's payload, whether stored as { data: { payload } } (admin) or { payload } (website). */
 function payloadOf(section) {
   let payload = section?.data?.payload ?? section?.payload;
@@ -63,6 +80,8 @@ function validateSections(sections, { strict = false } = {}) {
   let footers = 0;
   let heroes = 0;
   let body = 0;
+  let pageForm = false;
+  let usesPageForm = false;
 
   sections.forEach((section, index) => {
     const at = `sections[${index}]`;
@@ -88,6 +107,7 @@ function validateSections(sections, { strict = false } = {}) {
       add(`${at}.payload`, 'Block content must be an object');
       return;
     }
+    if (popupForms(payload || {}).includes('')) usesPageForm = true;
     unsafeLinks(payload || {}, `${at}.payload`, []).forEach((field) => add(field, 'Links and media must use http(s), a site path, # anchor, mailto: or tel:'));
     unsafeLinks(isObject(section.config) ? section.config : {}, `${at}.config`, []).forEach((field) => add(field, 'Background images must use http(s) or a Media path'));
 
@@ -99,6 +119,7 @@ function validateSections(sections, { strict = false } = {}) {
     }
 
     body += 1;
+    if (type === 'Form' && (payload?.formId || payload?.form?.id)) pageForm = true;
     if (type === 'HeroBanner') heroes += 1;
     if (strict && type === 'Form' && !(payload?.formId || payload?.form?.id)) add(`${at}.payload.formId`, 'The Form block has no form selected');
     if (strict && type === 'Packages' && !(Array.isArray(payload?.packageIds) && payload.packageIds.length)) {
@@ -109,6 +130,9 @@ function validateSections(sections, { strict = false } = {}) {
   if (headers > 1) add('sections', 'A landing page can have only one Header block');
   if (footers > 1) add('sections', 'A landing page can have only one Footer block');
   if (heroes > 1) add('sections', 'A landing page can have only one Hero Banner');
+  if (strict && usesPageForm && !pageForm) {
+    add('sections', 'A button opens "the form on this page" in a popup, but the page has no Form block with a form selected');
+  }
   if (strict && body === 0) add('sections', 'Add at least one content block to the page body before publishing');
   return errors;
 }
@@ -121,6 +145,7 @@ function referencesOf(sections) {
     const payload = payloadOf(section);
     if (!isObject(payload)) return;
     if (payload.formId) formIds.add(String(payload.formId));
+    popupForms(payload).filter(Boolean).forEach((id) => formIds.add(id));
     if (Array.isArray(payload.packageIds)) payload.packageIds.filter(Boolean).forEach((id) => packageIds.add(String(id)));
   });
   return { formIds: [...formIds], packageIds: [...packageIds] };
@@ -138,4 +163,4 @@ function normalizeSections(sections) {
   });
 }
 
-module.exports = { HEADER_TYPE, FOOTER_TYPE, REGION_MODES, validateSections, referencesOf, normalizeSections, payloadOf };
+module.exports = { HEADER_TYPE, FOOTER_TYPE, REGION_MODES, validateSections, referencesOf, normalizeSections, payloadOf, popupForms };

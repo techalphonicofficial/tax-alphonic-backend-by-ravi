@@ -1,13 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const SeoController = require('../controllers/SeoController');
+const RobotsTxtController = require('../controllers/RobotsTxtController');
 const { verifyToken, checkPermission } = require('../middlewares/auth');
 
 // Public: the website reads the active config of the page it renders.
 router.get('/lookup', SeoController.getByRoute);
+// Public: custom robots.txt for the website's /robots.txt ({ content: null } = automatic).
+router.get('/robots-txt/public', RobotsTxtController.getPublic);
 
 // Admin (SEO Management → SEO Configs)
 router.use(verifyToken);
+// SEO → Robots.txt (before /:id)
+router.get('/robots-txt', checkPermission('read', 'SEO'), RobotsTxtController.get);
+router.put('/robots-txt', checkPermission('update', 'SEO'), RobotsTxtController.update);
 router.get('/', checkPermission('read', 'SEO'), SeoController.getAll);
 router.get('/:id', checkPermission('read', 'SEO'), SeoController.getById);
 router.post('/', checkPermission('create', 'SEO'), SeoController.create);

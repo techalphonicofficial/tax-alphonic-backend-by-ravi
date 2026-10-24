@@ -100,3 +100,20 @@ test('referencesOf and normalizeSections', () => {
     { id: 'p', type: 'Packages', config: {}, data: { payload: { packageIds: ['a', 'b', 'a'] } } },
   ]);
 });
+
+test('form popup buttons: referenced forms and the page form', () => {
+  const { popupForms } = require('../services/landing/landingValidation');
+  assert.deepEqual(popupForms({ button: { text: 'Enquire', url: '#form' }, steps: [{ url: '#form-abc_1' }], other: '#formx' }), ['', 'abc_1']);
+
+  const header = { id: 'h', type: 'LandingHeader', data: { payload: { mode: 'simple', button: { text: 'Enquire Now', url: '#form' } } } };
+  const hero = { id: 'x', type: 'HeroBanner', data: { payload: { primaryButton: { text: 'Call me', url: '#form-f9' } } } };
+  const form = { id: 'f', type: 'Form', data: { payload: { formId: 'f1' } } };
+
+  // "#form" needs a Form block with a form before publishing; drafts may save without one.
+  assert.match(validateSections([header, hero], { strict: true }).map((e) => e.message).join(' '), /no Form block/);
+  assert.equal(validateSections([header, hero]).length, 0);
+  assert.equal(validateSections([header, hero, form], { strict: true }).length, 0);
+
+  // Popup forms are checked like Form blocks' forms on publish.
+  assert.deepEqual(referencesOf([header, hero, form]).formIds.sort(), ['f1', 'f9']);
+});

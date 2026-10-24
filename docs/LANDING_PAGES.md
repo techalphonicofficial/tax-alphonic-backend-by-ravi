@@ -156,3 +156,6 @@ The application never touches DNS, certificates or the web server.
   shows the real ones.
 - The draft `pages` row of a landing page shows in the Pages audit history; the landing page's own
   changes are logged under "Landing Pages".
+
+## Form popups (2026-10-23)
+Buttons can store `#form-<form id>` (open that form in a popup) or `#form` (the page's own Form block). On publish, `referencesOf` also checks the popup form ids (must exist and be active), and `validateSections` (strict) refuses `#form` when the page has no Form block with a form.
