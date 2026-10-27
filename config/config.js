@@ -10,7 +10,9 @@ const fromEnv = () => ({
   port: Number(process.env.DB_PORT) || 3306,
   dialect: process.env.DB_DIALECT || 'mysql',
   // The DB server is case-sensitive and the table is lowercase
-  migrationStorageTableName: 'sequelizemeta'
+  migrationStorageTableName: 'sequelizemeta',
+  // SQL queries are not printed (Sequelize prints every query by default). DB_LOG_SQL=true in .env shows them.
+  logging: process.env.DB_LOG_SQL === 'true' ? console.log : false
 });
 
 module.exports = {

@@ -10,7 +10,7 @@ const { requirePermission } = require('../middlewares/auth');
 const MODULE = 'LandingPages';
 const can = (action) => requirePermission(action, MODULE);
 
-// Public: the website resolves a subdomain (?host=cbdt.taxalphonic.com or ?slug=cbdt) to the
+// Public: the website resolves a landing page (?slug=cbdt for /lp/cbdt; ?host= for old subdomains) to the
 // live version of a published landing page. Drafts, archived and unpublished pages → 404.
 router.get('/public/resolve', v.resolveQuery, LandingPageController.resolve);
 
@@ -18,6 +18,8 @@ router.get('/public/resolve', v.resolveQuery, LandingPageController.resolve);
 router.get('/', ...can('read'), v.listQuery, LandingPageController.list);
 router.get('/service-options', ...can('read'), LandingPageController.serviceOptions);
 router.get('/check-slug', ...can('read'), v.slugQuery, LandingPageController.checkSlug);
+router.get('/themes', ...can('read'), LandingPageController.themes);
+router.put('/themes', ...can('update'), LandingPageController.saveThemes);
 router.post('/', ...can('create'), v.createSchema, LandingPageController.create);
 router.get('/:id', ...can('read'), v.idParam, LandingPageController.getById);
 router.put('/:id', ...can('update'), v.updateSchema, LandingPageController.updateSettings);

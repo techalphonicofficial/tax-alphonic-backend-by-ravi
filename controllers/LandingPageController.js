@@ -2,6 +2,7 @@ const LandingPageService = require('../services/LandingPageService');
 const { LandingPageError } = require('../services/LandingPageService');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const { logger } = require('../config/logger');
+const CustomThemes = require('../services/landing/customThemes');
 
 // Admin + public handlers of /landing-pages (routes/landingPageRoutes.js).
 const handle = (label, work, { status = 200, message = 'OK' } = {}) => async (req, res) => {
@@ -13,9 +14,9 @@ const handle = (label, work, { status = 200, message = 'OK' } = {}) => async (re
     }
     return successResponse(res, message, result, null, status);
   } catch (error) {
-    if (error instanceof LandingPageError) return errorResponse(res, error.message, error.errors, error.status);
+    if (error instanceof LandingPageError || error instanceof CustomThemes.ThemeError) return errorResponse(res, error.message, error.errors, error.status);
     if (error?.name === 'SequelizeUniqueConstraintError') {
-      return errorResponse(res, 'Validation Error', [{ field: 'slug', message: 'This subdomain is already used by another landing page' }], 422);
+      return errorResponse(res, 'Validation Error', [{ field: 'slug', message: 'This URL name is already used by another landing page' }], 422);
     }
     logger.error(`${label} Error: ${error.message}`);
     return errorResponse(res, 'Something went wrong while handling the landing page', [], 500);
@@ -23,9 +24,12 @@ const handle = (label, work, { status = 200, message = 'OK' } = {}) => async (re
 };
 
 const LandingPageController = {
+  // "My themes": custom colour themes shared by every landing page.
+  themes: handle('List Landing Themes', () => CustomThemes.list(), { message: 'Custom themes' }),
+  saveThemes: handle('Save Landing Themes', (req) => CustomThemes.save(req.body?.themes), { message: 'Custom themes saved' }),
   list: handle('List Landing Pages', (req) => LandingPageService.list(req.query), { message: 'Landing pages retrieved successfully' }),
   serviceOptions: handle('Landing Service Options', () => LandingPageService.serviceOptions(), { message: 'Services retrieved successfully' }),
-  checkSlug: handle('Check Landing Slug', (req) => LandingPageService.checkSlug(req.query.slug, req.query.exceptId), { message: 'Subdomain checked' }),
+  checkSlug: handle('Check Landing Slug', (req) => LandingPageService.checkSlug(req.query.slug, req.query.exceptId), { message: 'URL name checked' }),
   getById: handle('Get Landing Page', (req) => LandingPageService.getById(req.params.id), { message: 'Landing page retrieved successfully' }),
   create: handle('Create Landing Page', (req) => LandingPageService.create(req.body, req.user), { status: 201, message: 'Landing page created successfully' }),
   updateSettings: handle('Update Landing Page', (req) => LandingPageService.updateSettings(req.params.id, req.body, req.user), { message: 'Landing page settings saved' }),

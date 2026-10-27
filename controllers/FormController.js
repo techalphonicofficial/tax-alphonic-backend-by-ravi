@@ -75,6 +75,19 @@ class FormController {
     }
   }
 
+  // Form Builder: the "Options from" sources (with counts), or one source's current options.
+  async optionSources(req, res) {
+    try {
+      const OptionSources = require('../services/forms/optionSources');
+      const { key } = req.params;
+      if (!key) return successResponse(res, 'Option sources', await OptionSources.listSources());
+      if (!OptionSources.isSource(key)) return handleError(res, Object.assign(new Error('Unknown option source'), { statusCode: 404 }), 'Form Option Source');
+      return successResponse(res, 'Options', await OptionSources.optionsFor(key, req.query));
+    } catch (error) {
+      return handleError(res, error, 'Form Option Sources');
+    }
+  }
+
   // Public: website submission -> CRM lead (Inquiry)
   async submit(req, res) {
     try {

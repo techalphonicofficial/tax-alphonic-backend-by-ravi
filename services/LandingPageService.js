@@ -15,7 +15,7 @@ const { LandingPage, LandingPageVersion, Page, Service, User, Form, Package, seq
  * - Publish: validates the draft, writes an immutable landing_page_versions snapshot and points
  *   publishedVersionId at it, in one transaction. The website reads only that snapshot
  *   (resolvePublic), so later draft saves never change the live page.
- * - Unpublish / archive clear publishedVersionId: the subdomain answers 404 at once.
+ * - Unpublish / archive clear publishedVersionId: its address (/lp/<slug>) answers 404 at once.
  */
 
 // Slug prefix of the draft pages behind landing pages (PageService hides and guards them).
@@ -98,7 +98,7 @@ class LandingPageService {
 
   async checkSlug(value, exceptId) {
     const slug = normalizeSubdomain(value);
-    const problem = slug ? await this.slugProblem(slug, exceptId) : 'Subdomain is required';
+    const problem = slug ? await this.slugProblem(slug, exceptId) : 'URL name is required';
     return { slug, available: !problem, message: problem || 'Available', url: slug ? landingUrl(slug) : '' };
   }
 
@@ -222,7 +222,7 @@ class LandingPageService {
     }
     if (body.slug !== undefined && text(body.slug).toLowerCase() !== row.slug) {
       const slug = text(body.slug).toLowerCase();
-      if (row.status === 'published') errors.push({ field: 'slug', message: 'Unpublish the page before changing its subdomain (the live address would break)' });
+      if (row.status === 'published') errors.push({ field: 'slug', message: 'Unpublish the page before changing its URL name (the live address would break)' });
       else {
         const issue = await this.slugProblem(slug, id);
         if (issue) errors.push({ field: 'slug', message: issue });
@@ -380,6 +380,8 @@ class LandingPageService {
   async toPublic(row, sections, extra = {}) {
     const service = row.serviceId ? await Service.findByPk(row.serviceId, { attributes: ['id', 'title', 'slug'] }) : null;
     return {
+      // The landing page's id: the website looks up its SEO Config with it (type "landing").
+      id: row.id || null,
       slug: row.slug,
       url: landingUrl(row.slug),
       title: row.title,
@@ -404,7 +406,7 @@ class LandingPageService {
     if (!row) return null;
     const version = row.publishedVersion;
     return this.toPublic(
-      { slug: row.slug, title: version.title, serviceId: version.serviceId, seo: version.seo },
+      { id: row.id, slug: row.slug, title: version.title, serviceId: version.serviceId, seo: version.seo },
       normalizeSections(version.sections),
       { version: version.version, publishedAt: row.publishedAt }
     );

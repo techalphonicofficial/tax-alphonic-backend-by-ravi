@@ -33,7 +33,7 @@ module.exports = {
   slugQuery: [query('slug').isString().isLength({ max: 100 }), query('exceptId').optional({ values: 'falsy' }).isUUID(), validate],
   createSchema: [
     body('title').isString().withMessage('Title is required').trim().notEmpty().withMessage('Title is required').isLength({ max: 255 }),
-    body('slug').isString().withMessage('Subdomain is required').trim().notEmpty().withMessage('Subdomain is required').isLength({ max: 63 }),
+    body('slug').isString().withMessage('URL name is required').trim().notEmpty().withMessage('URL name is required').isLength({ max: 63 }),
     body('serviceId').optional({ values: 'falsy' }).isUUID().withMessage('Invalid service id'),
     body('copyServiceBlocks').optional().isBoolean(),
     body('sections').optional().isArray().withMessage('Sections must be an array'),

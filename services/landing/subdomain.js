@@ -1,7 +1,7 @@
-// Landing page subdomains: <label>.<base domain>, e.g. cbdt.taxalphonic.com.
-// The label is a single DNS label (RFC 1123): lowercase letters, digits and hyphens, 2-63
-// characters, no hyphen at either end. DNS and SSL are set up once with a wildcard record
-// (*.taxalphonic.com); creating a landing page never touches DNS.
+// Landing page addresses: <landing site>/lp/<label>, e.g. https://services.taxalphonic.com/lp/cbdt
+// (until 2026-10-26 they were subdomains, cbdt.taxalphonic.com; the website now redirects those
+// to the new address, which is why labelFromHost is kept; "services" is the landing host itself). The label keeps the old DNS-label rules:
+// lowercase letters, digits and hyphens, 2-63 characters, no hyphen at either end.
 
 // Hosts the company already uses or may need for infrastructure. Never a landing page.
 const RESERVED = new Set([
@@ -11,7 +11,7 @@ const RESERVED = new Set([
   'cdn', 'static', 'assets', 'media', 'uploads', 'files', 'img', 'images',
   'dev', 'staging', 'stage', 'test', 'testing', 'qa', 'uat', 'demo', 'beta', 'sandbox', 'preview',
   'localhost', 'status', 'docs', 'help', 'support', 'blog', 'shop', 'store', 'pay', 'payments',
-  'secure', 'login', 'auth', 'account', 'accounts', 'id', 'sso', 'portal', 'landing', 'lp',
+  'secure', 'login', 'auth', 'account', 'accounts', 'id', 'sso', 'portal', 'landing', 'lp', 'services',
 ]);
 
 const extraReserved = () => String(process.env.LANDING_RESERVED_SUBDOMAINS || '')
@@ -36,12 +36,12 @@ const isReserved = (label) => RESERVED.has(label) || extraReserved().includes(la
 /** '' when `label` can be used, else the reason (shown to the editor). */
 function subdomainError(label) {
   const value = String(label ?? '');
-  if (!value) return 'Subdomain is required';
-  if (value.length < 2) return 'Subdomain must be at least 2 characters';
-  if (value.length > 63) return 'Subdomain must be at most 63 characters';
+  if (!value) return 'URL name is required';
+  if (value.length < 2) return 'URL name must be at least 2 characters';
+  if (value.length > 63) return 'URL name must be at most 63 characters';
   if (!LABEL.test(value)) return 'Use lowercase letters, digits and hyphens only, not starting or ending with a hyphen';
   if (value.slice(2, 4) === '--') return 'A hyphen pair in the 3rd-4th place is reserved for DNS (e.g. "xn--")';
-  if (/^\d+$/.test(value)) return 'Subdomain cannot be only digits';
+  if (/^\d+$/.test(value)) return 'URL name cannot be only digits';
   if (isReserved(value)) return `"${value}" is reserved for the system`;
   return '';
 }
@@ -70,11 +70,17 @@ function labelFromHost(host, domains = baseDomains()) {
   return null;
 }
 
-/** Public URL of a landing page: https://<label>.<first base domain>/ */
-function landingUrl(label, domains = baseDomains()) {
-  const domain = domains[0] || 'taxalphonic.com';
-  const local = domain === 'localhost';
-  return `${local ? 'http' : 'https'}://${label}.${domain}${local ? ':3000' : ''}/`;
+/** Origin landing pages live on (.env LANDING_SITE_URL, default https://services.taxalphonic.com). */
+function siteBase() {
+  return String(process.env.LANDING_SITE_URL || 'https://services.taxalphonic.com').trim().replace(/[/]+$/, '');
 }
 
-module.exports = { RESERVED, normalizeSubdomain, subdomainError, isReserved, baseDomains, labelFromHost, landingUrl };
+/** Path of a landing page on the landing site: /lp/<label> */
+const landingPath = (label) => `/lp/${label}`;
+
+/** Public URL of a landing page: https://services.taxalphonic.com/lp/<label> */
+function landingUrl(label, base = siteBase()) {
+  return `${base}${landingPath(label)}`;
+}
+
+module.exports = { RESERVED, normalizeSubdomain, subdomainError, isReserved, baseDomains, labelFromHost, landingUrl, landingPath, siteBase };

@@ -6,6 +6,7 @@ const MailService = require('./MailService');
 const { logger } = require('../config/logger');
 const { Form, sequelize } = require('../models');
 const { findSectionUsages } = require('../utils/sectionUsages');
+const OptionSources = require('./forms/optionSources');
 
 const FIELD_TYPES = ['text', 'email', 'phone', 'number', 'textarea', 'select', 'radio', 'checkbox', 'date', 'hidden'];
 const OPTION_TYPES = ['select', 'radio', 'checkbox'];
@@ -148,7 +149,13 @@ class FormService extends BaseService {
   async getPublic(identifier) {
     const form = await this.repository.findActiveByIdOrSlug(identifier);
     if (!form) throw new HttpError('Form not found', 404);
-    return this.toPublic(form);
+    return this.toPublicLive(form);
+  }
+
+  /** toPublic with the options of "Options from" fields filled from site data. */
+  async toPublicLive(form) {
+    const data = this.toPublic(form);
+    return { ...data, fields: await OptionSources.withLiveOptions(data.fields) };
   }
 
   toPublic(form) {
@@ -158,7 +165,7 @@ class FormService extends BaseService {
       name,
       slug,
       description,
-      fields: (fields || []).map(({ mapTo, ...field }) => field),
+      fields: (fields || []).map(({ mapTo, optionsFilter, ...field }) => field),
       settings: {
         submitButtonText: settings?.submitButtonText || 'Submit',
         successMessage: settings?.successMessage || 'Thank you! Your submission has been received.',
@@ -183,7 +190,8 @@ class FormService extends BaseService {
       return response;
     }
 
-    const fields = form.fields || [];
+    // "Options from" fields accept the current site list (+ the hand-written options).
+    const fields = await OptionSources.withLiveOptions(form.fields || []);
     const { values, errors } = this._validateSubmission(fields, body);
     if (errors.length > 0) {
       throw new HttpError('Please correct the highlighted fields.', 422, errors);
@@ -291,7 +299,7 @@ class FormService extends BaseService {
     const uniqueIds = [...new Set(ids.filter(Boolean))];
     if (uniqueIds.length === 0) return null;
     const forms = await Form.findAll({ where: { id: uniqueIds, status: 'active' } });
-    return new Map(forms.map(f => [f.id, this.toPublic(f)]));
+    return new Map(await Promise.all(forms.map(async f => [f.id, await this.toPublicLive(f)])));
   }
 
   // ---------------------------------------------------------------------------
@@ -382,6 +390,8 @@ class FormService extends BaseService {
       }
 
       let options = [];
+      // "Options from" (services, landing pages, ...): filled live; hand-written options are extras.
+      const optionsSource = OPTION_TYPES.includes(type) && OptionSources.isSource(field.optionsSource) ? field.optionsSource : '';
       if (OPTION_TYPES.includes(type)) {
         options = (Array.isArray(field.options) ? field.options : [])
           .map(o => ({
@@ -389,7 +399,7 @@ class FormService extends BaseService {
             value: String(o?.value ?? o?.label ?? '').trim()
           }))
           .filter(o => o.value !== '');
-        if (type !== 'checkbox' && options.length === 0) push('options', 'add at least one option');
+        if (type !== 'checkbox' && !optionsSource && options.length === 0) push('options', 'add at least one option');
         if (new Set(options.map(o => o.value)).size !== options.length) push('options', 'option values must be unique');
       }
 
@@ -427,6 +437,7 @@ class FormService extends BaseService {
         required: Boolean(field.required),
         width: field.width === 'half' ? 'half' : 'full',
         options,
+        ...(optionsSource ? { optionsSource, optionsFilter: OptionSources.cleanFilter(optionsSource, field.optionsFilter) } : {}),
         defaultValue: isEmptyValue(field.defaultValue) ? '' : field.defaultValue,
         validation,
         mapTo

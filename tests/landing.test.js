@@ -1,7 +1,7 @@
 // Landing pages: subdomain rules and block validation (no database needed). Run: npm test
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeSubdomain, subdomainError, labelFromHost, landingUrl } = require('../services/landing/subdomain');
+const { normalizeSubdomain, subdomainError, labelFromHost, landingUrl, landingPath } = require('../services/landing/subdomain');
 const { validateSections, referencesOf, normalizeSections } = require('../services/landing/landingValidation');
 
 test('normalizeSubdomain makes a DNS label', () => {
@@ -49,8 +49,11 @@ test('labelFromHost only trusts one label under a configured base domain', () =>
 });
 
 test('landingUrl builds the public address', () => {
-  assert.equal(landingUrl('cbdt', ['taxalphonic.com']), 'https://cbdt.taxalphonic.com/');
-  assert.equal(landingUrl('cbdt', ['localhost']), 'http://cbdt.localhost:3000/');
+  assert.equal(landingUrl('cbdt', 'https://taxalphonic.com'), 'https://taxalphonic.com/lp/cbdt');
+  assert.equal(landingUrl('gst', 'http://localhost:3000'), 'http://localhost:3000/lp/gst');
+  assert.equal(landingPath('cbdt'), '/lp/cbdt');
+  assert.equal(landingUrl('cbdt'), process.env.LANDING_SITE_URL ? landingUrl('cbdt') : 'https://services.taxalphonic.com/lp/cbdt');
+  assert.equal(subdomainError('services'), '"services" is reserved for the system');
 });
 
 const block = (id, type, payload = {}, config = {}) => ({ id, type, config, data: { payload } });
@@ -116,4 +119,18 @@ test('form popup buttons: referenced forms and the page form', () => {
 
   // Popup forms are checked like Form blocks' forms on publish.
   assert.deepEqual(referencesOf([header, hero, form]).formIds.sort(), ['f1', 'f9']);
+});
+
+test('custom theme colours are checked (they become CSS)', () => {
+  const header = (payload) => ({ id: 'h', type: 'LandingHeader', data: { payload: { mode: 'simple', ...payload } } });
+  const body = { id: 'b', type: 'Overview', data: { payload: {} } };
+  assert.equal(validateSections([header({ pageTheme: 'custom', customTheme: { name: 'Mine', brand: '#1A73E8', accent: '#f59e0b', deep: '#0b1120' } }), body]).length, 0);
+  const bad = validateSections([header({ pageTheme: 'custom', customTheme: { brand: 'red;background:url(x)', accent: '#fff', deep: '#0b1120' } }), body]);
+  assert.deepEqual(bad.map((e) => e.field), ['sections[0].payload.customTheme.brand', 'sections[0].payload.customTheme.accent']);
+  assert.equal(validateSections([header({ pageTheme: 'custom' }), body]).length, 3);
+  assert.equal(validateSections([header({ pageTheme: 'ocean' }), body]).length, 0);
+
+  const { cleanTheme } = require('../services/landing/customThemes');
+  assert.deepEqual(cleanTheme({ name: ' Brand ', brand: '#ABCDEF', accent: '#000000', deep: '#111111' }), { theme: { name: 'Brand', brand: '#abcdef', accent: '#000000', deep: '#111111' }, errors: [] });
+  assert.equal(cleanTheme({ brand: '#abc' }).errors.length, 4);
 });

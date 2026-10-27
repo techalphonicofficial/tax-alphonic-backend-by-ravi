@@ -2,11 +2,11 @@ const SeoRepository = require('../repositories/SeoRepository');
 const { Op } = require('sequelize');
 
 // SEO Configs: a detailed SEO override for one website page. The admin picks the page
-// (a service, a CMS page, a pSEO page, Home / About, or a typed URL); the website asks for the
+// (a service, a CMS page, a pSEO page, a landing page, Home / About, or a typed URL); the website asks for the
 // config of the record it renders (GET /seo/lookup) and uses each non-empty field over the
 // record's own SEO.
 
-const TARGET_TYPES = ['service', 'page', 'seo_page', 'static', 'custom'];
+const TARGET_TYPES = ['service', 'page', 'seo_page', 'landing', 'static', 'custom'];
 const STATIC_TARGETS = { home: { route: '/', label: 'Homepage' }, about: { route: '/about', label: 'About page' } };
 const FIELDS = [
     'route', 'metaTitle', 'metaDescription', 'keywords', 'canonicalUrl', 'ogImage', 'otherMetaTags', 'status',
@@ -30,7 +30,7 @@ const validationError = (res, errors) => res.status(422).json({ success: false, 
 
 /** The page a service / page / pSEO target points at: { route, label }, or null when it doesn't exist. */
 async function resolveTarget(type, id) {
-    const { Service, Page, Seopage } = require('../models');
+    const { Service, Page, Seopage, LandingPage } = require('../models');
     if (type === 'static') return STATIC_TARGETS[id] || null;
     if (type === 'service') {
         const service = await Service.findByPk(id, { attributes: ['id', 'title', 'slug'] });
@@ -44,6 +44,12 @@ async function resolveTarget(type, id) {
     if (type === 'seo_page') {
         const page = await Seopage.findByPk(id, { attributes: ['id', 'title', 'slug'] });
         return page ? { route: normalizeRoute(page.slug), label: page.title } : null;
+    }
+    if (type === 'landing') {
+        // A landing page lives at /lp/<slug> on the main website.
+        const { landingPath } = require('../services/landing/subdomain');
+        const page = await LandingPage.findByPk(id, { attributes: ['id', 'title', 'slug'] });
+        return page ? { route: landingPath(page.slug), label: page.title } : null;
     }
     return null;
 }

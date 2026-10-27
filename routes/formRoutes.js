@@ -20,6 +20,8 @@ router.post('/public/:identifier/submit', submitLimiter, FormController.submit);
 // Admin routes
 router.use(verifyToken);
 router.get('/', checkPermission('read', 'Forms'), FormController.getAll);
+router.get('/option-sources', checkPermission('read', 'Forms'), FormController.optionSources);
+router.get('/option-sources/:key', checkPermission('read', 'Forms'), FormController.optionSources);
 router.get('/:id', checkPermission('read', 'Forms'), FormController.getById);
 router.post('/', checkPermission('create', 'Forms'), FormController.create);
 router.post('/:id/duplicate', checkPermission('create', 'Forms'), FormController.duplicate);

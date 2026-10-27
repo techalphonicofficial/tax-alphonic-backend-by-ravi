@@ -16,6 +16,9 @@ const URL_KEY = /(^|[a-z])(url|href|link|src|image|logo|icon|poster|avatar|photo
 const BAD_SCHEME = /^\s*(javascript|vbscript|data:text\/html)\s*:?/i;
 
 const isObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+// Custom colour theme of a page (Header payload.customTheme), written into CSS variables by the website.
+const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
+const THEME_COLOURS = ['brand', 'accent', 'deep'];
 
 // Button / link URLs that open a CMS form in a popup on the website (lib/formPopup.js there):
 // "#form-<form id>" = that form, "#form" = the page's own form (first Form block).
@@ -113,6 +116,12 @@ function validateSections(sections, { strict = false } = {}) {
 
     if (type === HEADER_TYPE || type === FOOTER_TYPE) {
       if (type === HEADER_TYPE) headers += 1; else footers += 1;
+      if (type === HEADER_TYPE && (payload?.pageTheme === 'custom' || payload?.customTheme !== undefined)) {
+        const custom = payload?.customTheme;
+        THEME_COLOURS.forEach((c) => {
+          if (!isObject(custom) || !HEX_COLOUR.test(String(custom[c] ?? ''))) add(`${at}.payload.customTheme.${c}`, 'Custom theme colours must look like #1a73e8');
+        });
+      }
       const mode = payload?.mode ?? 'site';
       if (!REGION_MODES.includes(mode)) add(`${at}.payload.mode`, `${type === HEADER_TYPE ? 'Header' : 'Footer'} style must be one of ${REGION_MODES.join(', ')}`);
       return;
