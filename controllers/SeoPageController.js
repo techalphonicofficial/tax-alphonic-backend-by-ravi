@@ -2,6 +2,7 @@ const SeoPageService = require('../services/SeoPageService');
 const SectionHydrator = require('../services/SectionHydrator');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const { logger } = require('../config/logger');
+const { reservedReason, findConflict, conflictMessage } = require('../services/slugRegistry');
 
 class SeoPageController {
   async create(req, res) {
@@ -375,6 +376,22 @@ class SeoPageController {
             description: comboDescription,
             existingSlug: ext.slug,
             reason
+          });
+          return;
+        }
+
+        // 3. The website URL must be free: no service, CMS page or trashed pSEO page with this slug,
+        // and not a path the website uses itself (services/slugRegistry.js). Skipped, not an error,
+        // so the rest of the batch is still created.
+        const blocked = reservedReason('seo_page', normalizedSlug);
+        const clash = blocked ? null : await findConflict('seo_page', normalizedSlug);
+        if (blocked || clash) {
+          overlaps.push({
+            type,
+            slug: normalizedSlug,
+            description: comboDescription,
+            existingSlug: clash ? clash.slug : undefined,
+            reason: blocked || conflictMessage(normalizedSlug, clash)
           });
           return;
         }

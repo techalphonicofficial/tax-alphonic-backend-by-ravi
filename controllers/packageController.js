@@ -106,7 +106,10 @@ class PackageController {
                 return res.status(404).json({ success: false, message: 'Package not found' });
             }
             const usages = await PackageService.findUsages(pkg.id);
-            res.status(200).json({ success: true, data: { ...pkg.toJSON(), usages } });
+            // includedServices resolved (title / note / url) for the admin Live Preview; the admin
+            // form edits the raw list in features.includedServices.
+            const [withServices] = await PackageService.withIncludedServices([pkg]);
+            res.status(200).json({ success: true, data: { ...withServices, usages } });
         } catch (error) {
             next(error);
         }

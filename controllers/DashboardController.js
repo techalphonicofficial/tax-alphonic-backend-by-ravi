@@ -2,6 +2,7 @@ const { Op, fn, col } = require('sequelize');
 const moment = require('moment');
 const db = require('../models');
 const { logger } = require('../config/logger');
+const { hasPermission } = require('../middlewares/auth');
 
 /**
  * GET /dashboard/stats: everything the admin dashboard shows, in one call.
@@ -211,6 +212,56 @@ async function recentActivity() {
   }));
 }
 
+// Every dashboard figure belongs to a module: a user only gets the figures of modules they may read
+// (same module names as the routes). The rest come back as zero / empty in the same shape, so the
+// admin dashboard renders without them (it also hides those tiles).
+const COUNT_MODULES = {
+  services: 'Services', serviceCategories: ['Services', 'ServiceCategories'], pages: ['CMS', 'Pages'],
+  seoPages: ['SEO', 'SEOPages'], seoConfigs: 'SEO', blogs: 'Blogs', blogCategories: ['Blogs', 'BlogCategories'],
+  forms: 'Forms', packages: 'Packages', faqs: ['CMS', 'FAQs'], testimonials: ['CMS', 'Testimonials'],
+  team: ['CMS', 'TeamMembers'], banners: ['CMS', 'Banners'], partners: ['CMS', 'Partners'], branches: ['CMS', 'Branches'],
+  countries: ['CMS', 'Countries'], portfolio: ['Portfolio', 'PortfolioItems'], locations: ['SEO', 'Locations'],
+  states: ['SEO', 'States'], industries: ['SEO', 'Industries'], technologies: ['SEO', 'Technologies'],
+  problems: ['SEO', 'Problems'], menus: ['CMS', 'Menus'], users: 'Users', roles: 'Roles',
+};
+const LEADS = ['CRM', 'Inquiries'];
+const TRASH_PERMISSIONS = ['Services', 'CMS', 'SEO', 'Blogs', 'Forms', 'Menus', 'Media'];
+
+const zeroed = (value) => {
+  if (typeof value === 'number') return 0;
+  if (Array.isArray(value)) return [];
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, zeroed(v)]));
+  return value === undefined ? undefined : null;
+};
+
+function forUser(data, user) {
+  const can = (module) => hasPermission(user, 'read', module);
+  const counts = { ...data.counts };
+  for (const [key, module] of Object.entries(COUNT_MODULES)) {
+    if (key in counts && !can(module)) counts[key] = zeroed(counts[key]);
+  }
+  if (!can('Services')) counts.oldServiceCategoryId = null;
+
+  const leads = can(LEADS) ? data.leads : { ...zeroed(data.leads), monthChange: null };
+  const todo = { ...data.attention };
+  if (!can(LEADS)) Object.assign(todo, { newLeads: 0, highPriorityLeads: 0 });
+  if (!can('Services')) Object.assign(todo, { draftServices: 0, servicesWithoutSeo: 0 });
+  if (!can(['SEO', 'SEOPages'])) todo.draftSeoPages = 0;
+  if (!can('Blogs')) todo.draftBlogs = 0;
+  if (!TRASH_PERMISSIONS.some((m) => can(m) || hasPermission(user, 'delete', m))) todo.trash = 0;
+
+  return {
+    ...data,
+    counts,
+    leads,
+    attention: todo,
+    media: can('Media') ? data.media : { ...zeroed(data.media), provider: data.media?.provider },
+    recentActivity: can('AuditLogs') ? data.recentActivity : [],
+    recentServices: can('Services') ? data.recentServices : [],
+    topBlogs: can('Blogs') ? data.topBlogs : [],
+  };
+}
+
 exports.getDashboardStats = async (req, res) => {
   try {
     const [counts, leads, media, activity, recentServices, topBlogs] = await Promise.all([
@@ -223,10 +274,8 @@ exports.getDashboardStats = async (req, res) => {
     ]);
     const todo = await safe(attention(counts, leads), {});
 
-    res.json({
-      success: true,
-      data: { generatedAt: new Date(), counts, leads, media, attention: todo, recentActivity: activity, recentServices, topBlogs },
-    });
+    const data = { generatedAt: new Date(), counts, leads, media, attention: todo, recentActivity: activity, recentServices, topBlogs };
+    res.json({ success: true, data: forUser(data, req.user) });
   } catch (error) {
     logger.error(`Dashboard Stats Error: ${error.message}`);
     res.status(500).json({ success: false, message: 'Could not load the dashboard.' });

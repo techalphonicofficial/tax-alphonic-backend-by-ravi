@@ -64,6 +64,8 @@ app.get('/', (req, res) => {
 const portfolioCategoryRoutes = require('./routes/portfolioCategory.routes');
 const portfolioItemRoutes = require('./routes/portfolioItem.routes');
 const routes = require('./routes');
+// Slug clash check on every save / restore of services, pages, pSEO pages, blogs, categories, forms.
+require('./services/slugRegistry').watchSlugs();
 app.use('/api/v1/portfolio-categories', portfolioCategoryRoutes);
 app.use('/api/v1/portfolio-items', portfolioItemRoutes);
 app.use('/api/v1', routes);

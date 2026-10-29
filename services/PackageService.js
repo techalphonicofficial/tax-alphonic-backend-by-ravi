@@ -1,4 +1,4 @@
-const { Package } = require('../models');
+const { Package, Service } = require('../models');
 const { findSectionUsages } = require('../utils/sectionUsages');
 
 // Page Builder block type that embeds packages (see cms-admin PageBuilder AVAILABLE_BLOCKS)
@@ -11,9 +11,48 @@ class PackageService {
   }
 
   toPublic(pkg) {
-    const { id, name, description, isRecommended, category, keywordTiers, features, pricingPlans, displayOrder } =
+    const { id, name, description, isRecommended, category, keywordTiers, features, pricingPlans, displayOrder, includedServices } =
       pkg.toJSON ? pkg.toJSON() : pkg;
-    return { id, name, description, isRecommended, category, keywordTiers, features, pricingPlans, displayOrder };
+    return { id, name, description, isRecommended, category, keywordTiers, features, pricingPlans, displayOrder, includedServices: includedServices || [] };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bundles: a package can include several services ("Income Tax + GST + ROC management").
+  // Saved by the admin in features.includedServices = [{ serviceId | null, title, label, note }]
+  // (inside the features JSON, so no schema change). `title` is the service title when it was
+  // picked (or the name of a custom item), `label` an optional name to show instead.
+  // The website gets includedServices = [{ title, note, url }]: a published service gives its
+  // current title and its link (/<slug>); a draft / deleted service or a custom item shows its
+  // saved title without a link.
+  // ---------------------------------------------------------------------------
+
+  static rawIncluded(pkg) {
+    const features = pkg?.features && typeof pkg.features === 'object' ? pkg.features : {};
+    const items = Array.isArray(features.includedServices) ? features.includedServices : [];
+    return items.filter((item) => item && (item.serviceId || item.title || item.label));
+  }
+
+  /** Plain package objects with `includedServices` resolved (one service query for all of them). */
+  async withIncludedServices(packages) {
+    const list = packages.map((p) => (p?.toJSON ? p.toJSON() : p));
+    const ids = [...new Set(list.flatMap((p) => PackageService.rawIncluded(p).map((item) => item.serviceId)).filter(Boolean))];
+    const services = ids.length
+      ? await Service.findAll({ where: { id: ids, status: 'published' }, attributes: ['id', 'title', 'slug'] })
+      : [];
+    const byId = new Map(services.map((s) => [s.id, s]));
+    return list.map((p) => ({
+      ...p,
+      includedServices: PackageService.rawIncluded(p)
+        .map((item) => {
+          const service = item.serviceId ? byId.get(item.serviceId) : null;
+          return {
+            title: String(item.label || service?.title || item.title || '').trim(),
+            note: String(item.note || '').trim(),
+            url: service?.slug ? `/${String(service.slug).replace(/^\/+/, '')}` : '',
+          };
+        })
+        .filter((item) => item.title),
+    }));
   }
 
   // ---------------------------------------------------------------------------
@@ -57,7 +96,7 @@ class PackageService {
   async _loadPackages(ids) {
     const uniqueIds = [...new Set(ids.filter(Boolean))];
     if (uniqueIds.length === 0) return null;
-    const packages = await Package.findAll({ where: { id: uniqueIds, status: 'active' } });
+    const packages = await this.withIncludedServices(await Package.findAll({ where: { id: uniqueIds, status: 'active' } }));
     return new Map(packages.map(p => [p.id, this.toPublic(p)]));
   }
 }
