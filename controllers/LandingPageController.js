@@ -3,6 +3,8 @@ const { LandingPageError } = require('../services/LandingPageService');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const { logger } = require('../config/logger');
 const CustomThemes = require('../services/landing/customThemes');
+const ThankYou = require('../services/landing/thankYou');
+const { landingUrl } = require('../services/landing/subdomain');
 
 // Admin + public handlers of /landing-pages (routes/landingPageRoutes.js).
 const handle = (label, work, { status = 200, message = 'OK' } = {}) => async (req, res) => {
@@ -14,7 +16,7 @@ const handle = (label, work, { status = 200, message = 'OK' } = {}) => async (re
     }
     return successResponse(res, message, result, null, status);
   } catch (error) {
-    if (error instanceof LandingPageError || error instanceof CustomThemes.ThemeError) return errorResponse(res, error.message, error.errors, error.status);
+    if (error instanceof LandingPageError || error instanceof CustomThemes.ThemeError || error instanceof ThankYou.ThankYouError) return errorResponse(res, error.message, error.errors, error.status);
     if (error?.name === 'SequelizeUniqueConstraintError') {
       return errorResponse(res, 'Validation Error', [{ field: 'slug', message: 'This URL name is already used by another landing page' }], 422);
     }
@@ -27,6 +29,11 @@ const LandingPageController = {
   // "My themes": custom colour themes shared by every landing page.
   themes: handle('List Landing Themes', () => CustomThemes.list(), { message: 'Custom themes' }),
   saveThemes: handle('Save Landing Themes', (req) => CustomThemes.save(req.body?.themes), { message: 'Custom themes saved' }),
+  // Thank-you page after a landing form + the landing tracking codes (services/landing/thankYou.js).
+  thankYou: handle('Get Landing Thank-you', () => ThankYou.get(), { message: 'Thank-you page' }),
+  // Admin read: also where the page lives ("View page").
+  thankYouAdmin: handle('Get Landing Thank-you', async () => ({ ...(await ThankYou.get()), pageUrl: landingUrl('thank-you') }), { message: 'Thank-you page' }),
+  saveThankYou: handle('Save Landing Thank-you', (req) => ThankYou.save(req.body), { message: 'Thank-you page saved' }),
   list: handle('List Landing Pages', (req) => LandingPageService.list(req.query), { message: 'Landing pages retrieved successfully' }),
   serviceOptions: handle('Landing Service Options', () => LandingPageService.serviceOptions(), { message: 'Services retrieved successfully' }),
   checkSlug: handle('Check Landing Slug', (req) => LandingPageService.checkSlug(req.query.slug, req.query.exceptId), { message: 'URL name checked' }),

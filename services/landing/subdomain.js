@@ -12,6 +12,8 @@ const RESERVED = new Set([
   'dev', 'staging', 'stage', 'test', 'testing', 'qa', 'uat', 'demo', 'beta', 'sandbox', 'preview',
   'localhost', 'status', 'docs', 'help', 'support', 'blog', 'shop', 'store', 'pay', 'payments',
   'secure', 'login', 'auth', 'account', 'accounts', 'id', 'sso', 'portal', 'landing', 'lp', 'services',
+  // /lp/thank-you is the thank-you page shown after every landing form.
+  'thank-you', 'thankyou', 'thanks',
 ]);
 
 const extraReserved = () => String(process.env.LANDING_RESERVED_SUBDOMAINS || '')

@@ -13,6 +13,9 @@ const can = (action) => requirePermission(action, MODULE);
 // Public: the website resolves a landing page (?slug=cbdt for /lp/cbdt; ?host= for old subdomains) to the
 // live version of a published landing page. Drafts, archived and unpublished pages → 404.
 router.get('/public/resolve', v.resolveQuery, LandingPageController.resolve);
+// Public: thank-you page shown after a landing form + the landing tracking codes (they are in the
+// website's HTML anyway). Admin: Landing Pages → Thank-you page & tracking.
+router.get('/public/thank-you', LandingPageController.thankYou);
 
 // Admin only.
 router.get('/', ...can('read'), v.listQuery, LandingPageController.list);
@@ -20,6 +23,8 @@ router.get('/service-options', ...can('read'), LandingPageController.serviceOpti
 router.get('/check-slug', ...can('read'), v.slugQuery, LandingPageController.checkSlug);
 router.get('/themes', ...can('read'), LandingPageController.themes);
 router.put('/themes', ...can('update'), LandingPageController.saveThemes);
+router.get('/thank-you', ...can('read'), LandingPageController.thankYouAdmin);
+router.put('/thank-you', ...can('update'), LandingPageController.saveThankYou);
 router.post('/', ...can('create'), v.createSchema, LandingPageController.create);
 router.get('/:id', ...can('read'), v.idParam, LandingPageController.getById);
 router.put('/:id', ...can('update'), v.updateSchema, LandingPageController.updateSettings);
