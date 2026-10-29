@@ -56,6 +56,11 @@ router.use('/seo', seoRoutes);
 router.use('/trash', require('./trashRoutes'));
 // Public, for the website's /sitemap.xml
 router.get('/sitemap', require('../controllers/SitemapController').getEntries);
+// Public: arithmetic captcha for website forms (services/captcha.js). Never cached.
+router.get('/captcha', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, message: 'Captcha', data: require('../services/captcha').create() });
+});
 router.use('/settings', settingRoutes);
 router.use('/about-page', aboutPageRoutes);
 router.use('/blogs', blogRoutes);

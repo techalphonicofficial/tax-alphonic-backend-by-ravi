@@ -7,6 +7,7 @@ const { logger } = require('../config/logger');
 const { Form, sequelize } = require('../models');
 const { findSectionUsages } = require('../utils/sectionUsages');
 const OptionSources = require('./forms/optionSources');
+const Captcha = require('./captcha');
 
 const FIELD_TYPES = ['text', 'email', 'phone', 'number', 'textarea', 'select', 'radio', 'checkbox', 'date', 'hidden'];
 const OPTION_TYPES = ['select', 'radio', 'checkbox'];
@@ -190,12 +191,16 @@ class FormService extends BaseService {
       return response;
     }
 
+    // Arithmetic captcha (wrong answer = 422 on "_captcha"); used up only once the fields are valid.
+    Captcha.verify(body, { consume: false });
+
     // "Options from" fields accept the current site list (+ the hand-written options).
     const fields = await OptionSources.withLiveOptions(form.fields || []);
     const { values, errors } = this._validateSubmission(fields, body);
     if (errors.length > 0) {
       throw new HttpError('Please correct the highlighted fields.', 422, errors);
     }
+    Captcha.consume(body);
 
     const mapped = {};
     fields.forEach(f => { if (f.mapTo) mapped[f.mapTo] = values[f.name]; });

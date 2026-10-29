@@ -3,6 +3,7 @@ const { Blog, BlogLike, BlogComment, sequelize } = require('../models');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const { logger } = require('../config/logger');
 const { liveWhere } = require('./BlogPublicController');
+const Captcha = require('../services/captcha');
 
 /**
  * Likes and comments on website blog posts.
@@ -170,6 +171,9 @@ class BlogEngagementController {
         return successResponse(res, 'Comment received', { comment: { id: 'hp', name, body, createdAt: new Date(), pending: true, mine: true } }, null, 201);
       }
 
+      // Arithmetic captcha (services/captcha.js); a wrong answer comes back on the "_captcha" field.
+      Captcha.verify(input);
+
       const links = (body.match(/https?:\/\/|www\./gi) || []).length;
       const comment = await BlogComment.create({
         blogId: blog.id,
@@ -189,6 +193,7 @@ class BlogEngagementController {
         201
       );
     } catch (error) {
+      if (error instanceof Captcha.CaptchaError) return errorResponse(res, error.message, error.errors, 422);
       logger.error(`Blog add comment Error: ${error.message}`);
       return errorResponse(res, 'Could not post the comment', [], 500);
     }

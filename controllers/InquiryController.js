@@ -1,6 +1,7 @@
 const InquiryService = require('../services/InquiryService');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const { logger } = require('../config/logger');
+const Captcha = require('../services/captcha');
 
 class InquiryController {
   async create(req, res) {
@@ -8,8 +9,11 @@ class InquiryController {
       const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip;
       const userAgent = req.headers['user-agent'];
 
+      // Public endpoint: the same arithmetic captcha as the website forms (services/captcha.js).
+      Captcha.verify(req.body || {});
+
       const payload = {
-        ...req.body,
+        ...Captcha.strip(req.body || {}),
         ipAddress: typeof clientIp === 'string' ? clientIp.split(',')[0].trim() : null,
         userAgent: userAgent ? userAgent.substring(0, 500) : null
       };
@@ -17,6 +21,7 @@ class InquiryController {
       const item = await InquiryService.create(payload);
       return successResponse(res, 'Thank you! Your message has been submitted successfully.', item, null, 201);
     } catch (error) {
+      if (error instanceof Captcha.CaptchaError) return errorResponse(res, error.message, error.errors, 422);
       logger.error(`Create Inquiry Error: ${error.message}`);
       return errorResponse(res, error.message, [], 400);
     }
