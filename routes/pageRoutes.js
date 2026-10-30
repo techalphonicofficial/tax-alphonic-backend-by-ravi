@@ -15,6 +15,8 @@ router.get('/tools-list', PageController.getTools);
 
 // Admin only.
 router.post('/', ...requirePermission('create', MODULE), createPageSchema, PageController.createPage);
+// Draft copy of a page (admin "Clone").
+router.post('/:id/clone', ...requirePermission('create', MODULE), PageController.clonePage);
 router.get('/', ...requirePermission('read', MODULE), PageController.getPages);
 router.get('/:id', ...requirePermission('read', MODULE), PageController.getPageById);
 router.put('/:id', ...requirePermission('update', MODULE), updatePageSchema, PageController.updatePage);

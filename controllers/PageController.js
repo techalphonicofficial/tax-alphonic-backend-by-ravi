@@ -13,6 +13,17 @@ class PageController {
     }
   }
 
+  // POST /pages/:id/clone → a draft copy (PageService.clone).
+  async clonePage(req, res) {
+    try {
+      const page = await PageService.clone(req.params.id);
+      return successResponse(res, `Draft copy "${page.title}" created`, page, null, 201);
+    } catch (error) {
+      logger.error(`Clone Page Error: ${error.message}`);
+      return errorResponse(res, error.message, error.errors || [], error.status || 400);
+    }
+  }
+
   async getPages(req, res) {
     try {
       const { data, pagination } = await PageService.getAll(req.query);

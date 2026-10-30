@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const BaseService = require('./BaseService');
 const PageRepository = require('../repositories/PageRepository');
 const SectionHydrator = require('./SectionHydrator');
+const { copyFields, copyTitle, freeCopySlug } = require('./cloneRecord');
 
 // Draft pages behind Landing Pages (LandingPageService): edited and published only through
 // /landing-pages, so the normal page list, public routes, publish and delete leave them alone.
@@ -39,6 +40,30 @@ class PageService extends BaseService {
     const page = await this.repository.findById(id);
     if (page && isLandingSlug(page.slug)) throw new Error('This page belongs to a Landing Page. Archive the landing page instead.');
     return super.delete(id, transaction);
+  }
+
+  /**
+   * A draft copy of a page with its content and blocks (services/cloneRecord.js): "<title> (Copy)",
+   * slug "<slug>-copy" (a journey stage / tool page stays under journey/ or tool/). The homepage and
+   * landing page drafts are not cloned: there is one homepage, and landing pages have Versions.
+   */
+  async clone(id) {
+    const page = await this.repository.findById(id);
+    if (!page) {
+      const err = new Error('Page not found');
+      err.status = 404;
+      throw err;
+    }
+    if (isLandingSlug(page.slug)) throw new Error('This page belongs to a Landing Page. Use the landing page Versions instead.');
+    if (page.slug === 'home') throw new Error('The homepage cannot be cloned: the site has one homepage.');
+    const plain = page.toJSON();
+    return this.create({
+      ...copyFields(plain, ['isFeatured']),
+      title: copyTitle(plain.title),
+      slug: await freeCopySlug('page', plain.slug),
+      status: 'draft',
+      isFeatured: false,
+    });
   }
 
   async getBySlug(slug) {

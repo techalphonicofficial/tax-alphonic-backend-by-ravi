@@ -11,6 +11,8 @@ router.use(verifyToken);
 router.get('/', checkPermission('read', 'Services'), ServiceController.getAll);
 router.get('/:id', checkPermission('read', 'Services'), ServiceController.getById);
 router.post('/', checkPermission('create', 'Services'), ServiceController.create);
+// Draft copy of a service with its blocks (admin "Clone").
+router.post('/:id/clone', checkPermission('create', 'Services'), ServiceController.clone);
 router.put('/:id', checkPermission('update', 'Services'), ServiceController.update);
 router.delete('/:id', checkPermission('delete', 'Services'), ServiceController.delete);
 

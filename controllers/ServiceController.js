@@ -75,6 +75,16 @@ class ServiceController {
       next(error);
     }
   }
+
+  // POST /services/:id/clone → a draft copy with all blocks (ServiceService.clone).
+  async clone(req, res) {
+    try {
+      const copy = await ServiceService.clone(req.params.id);
+      res.status(201).json({ success: true, message: `Draft copy "${copy.title}" created`, data: copy });
+    } catch (error) {
+      res.status(error.status || 400).json({ success: false, message: error.message, errors: error.errors || [] });
+    }
+  }
 }
 
 module.exports = new ServiceController();

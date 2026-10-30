@@ -4,6 +4,7 @@ const { Service, ServiceSection, ServiceSectionData, SectionType } = require('..
 const ServiceRepository = require('../repositories/ServiceRepository');
 const AuditLogService = require('./AuditLogService');
 const { describeSectionChanges, summarizeSections, moduleLabel } = require('../utils/auditDescribe');
+const { copyFields, copyTitle, freeCopySlug } = require('./cloneRecord');
 
 class ServiceService extends BaseService {
   constructor() {
@@ -54,6 +55,45 @@ class ServiceService extends BaseService {
       ]
     });
     return service;
+  }
+
+  /**
+   * A draft copy of a service with all its Page Builder blocks (services/cloneRecord.js):
+   * "<title> (Copy)", slug "<slug>-copy". Returns the new service with its sections.
+   */
+  async clone(id) {
+    const source = await this.getServiceWithSections(id);
+    if (!source) {
+      const err = new Error('Service not found');
+      err.status = 404;
+      throw err;
+    }
+    const plain = source.toJSON();
+    const parse = (value, fallback) => {
+      if (typeof value !== 'string') return value ?? fallback;
+      try { return JSON.parse(value); } catch { return fallback; }
+    };
+    const sections = (plain.sections || []).map((sec) => ({
+      sectionTypeId: sec.type?.componentKey,
+      config: parse(sec.config, {}),
+      data: { payload: parse(sec.data?.payload, {}) },
+    })).filter((sec) => sec.sectionTypeId);
+
+    const copy = await this.create({
+      ...copyFields(plain, ['sections', 'featured']),
+      title: copyTitle(plain.title),
+      slug: await freeCopySlug('service', plain.slug),
+      status: 'draft',
+      featured: false,
+    });
+    try {
+      if (sections.length) await this.saveServiceSections(copy.id, sections);
+    } catch (error) {
+      // No half copy: a service without its blocks would look like a broken clone.
+      await Service.destroy({ where: { id: copy.id }, force: true });
+      throw error;
+    }
+    return this.getServiceWithSections(copy.id);
   }
 
   async saveServiceSections(serviceId, sectionsPayload) {
