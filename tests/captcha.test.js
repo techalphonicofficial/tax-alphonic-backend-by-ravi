@@ -55,3 +55,15 @@ test('questions never go negative and strip() drops the captcha keys', () => {
   for (let i = 0; i < 300; i++) assert.ok(solve(Captcha.create().question) > 0);
   assert.deepEqual(Captcha.strip({ name: 'A', _captcha: '3', _captchaToken: 't' }), { name: 'A' });
 });
+
+test('questions use single digits, with a single-digit answer', () => {
+  for (let i = 0; i < 500; i += 1) {
+    const { question } = Captcha.create();
+    const [a, op, b] = question.split(' ');
+    assert.match(a, /^[1-9]$/);
+    assert.match(b, /^[1-9]$/);
+    assert.ok(['+', '−'].includes(op));
+    const answer = solve(question);
+    assert.ok(answer >= 1 && answer <= 9, question);
+  }
+});

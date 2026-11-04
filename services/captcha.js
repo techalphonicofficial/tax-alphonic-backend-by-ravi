@@ -30,19 +30,14 @@ const b64 = (value) => Buffer.from(value).toString('base64url');
 const sign = (data, answer) => crypto.createHmac('sha256', secret()).update(`${data}.${answer}`).digest('base64url');
 const rand = (min, max) => crypto.randomInt(min, max + 1);
 
-/** A random sum, difference (never negative) or small product. */
+/** A random sum or difference: both numbers and the answer are single digits, never negative. */
 function makeQuestion() {
-  const kind = rand(0, 2);
-  if (kind === 0) {
-    const a = rand(1, 20), b = rand(1, 20);
+  if (rand(0, 1) === 0) {
+    const a = rand(1, 8), b = rand(1, 9 - a);
     return { question: `${a} + ${b}`, answer: a + b };
   }
-  if (kind === 1) {
-    const a = rand(5, 25), b = rand(1, a - 1);
-    return { question: `${a} − ${b}`, answer: a - b };
-  }
-  const a = rand(2, 9), b = rand(2, 9);
-  return { question: `${a} × ${b}`, answer: a * b };
+  const a = rand(2, 9), b = rand(1, a - 1);
+  return { question: `${a} − ${b}`, answer: a - b };
 }
 
 const used = new Map(); // nonce -> expiry time
