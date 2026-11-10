@@ -68,6 +68,8 @@ router.use('/blog-categories', blogCategoryRoutes);
 router.use('/blog-tags', blogtagsRoutes);
 router.use('/blog-authors', blogauthorsRoutes);
 router.use('/blog-comments', blogCommentsRoutes);
+// Newsletter sign-ups: public POST /newsletter/subscribe, admin list / export (routes/newsletterRoutes.js).
+router.use('/newsletter', require('./newsletterRoutes'));
 router.use('/branches', branchRoutes);
 router.use('/partners', partnerRoutes);
 router.use('/countries', countryRoutes);
