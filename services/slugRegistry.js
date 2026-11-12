@@ -8,8 +8,12 @@
  * - every other slugged table is its own namespace (blogs at /blog/<slug>, categories, tags,
  *   portfolio, forms). Landing pages have their own check (services/landing/subdomain.js).
  *
- * Trashed (soft-deleted) rows still hold their slug: restoring them must not clash, and the
- * database unique index counts them too.
+ * Deleting frees the slug (2026-11-12): a record moved to Trash gets the stored slug
+ * "~trash-<time>-<slug>" (TRASH_RE), so a new record can use the slug at once; restoring puts the
+ * original back, or "<slug>-2" … when it was taken meanwhile. Rows trashed before this change still
+ * hold their plain slug: they are released the moment another record asks for it (assertSlugFree).
+ * Deleting a live record also adds its path to the gone list (goneUrls.js → website 410), and a
+ * service / page / pSEO page linked in a website menu cannot be deleted until the link is changed.
  *
  * watchSlugs() adds model hooks (create, slug change, restore), so every code path is covered;
  * GET /slugs/check (routes/slugRoutes.js) lets the admin show the result while typing.
@@ -34,6 +38,22 @@ const RESERVED_SITE = new Set([
   'sitemaps', 'sitemap.xml', 'robots.txt', 'api', '_next', 'uploads', 'favicon.ico', 'home',
 ]);
 
+const TRASH_RE = /^~trash-[a-z0-9]+-/;
+/** The slug a trashed row had ("~trash-…-gst" → "gst"); other slugs unchanged. */
+const originalSlug = (slug) => String(slug ?? '').replace(TRASH_RE, '');
+const isTrashedSlug = (slug) => TRASH_RE.test(String(slug ?? ''));
+const trashedSlug = (slug) => `~trash-${Date.now().toString(36)}-${originalSlug(slug)}`.slice(0, 255);
+/** Website path of a record ('' when it has none). */
+function sitePath(kind, slug) {
+  const clean = normalizeSlug(originalSlug(slug));
+  if (!clean) return '';
+  if (kind === 'blog') return `/blog/${clean}`;
+  if (KINDS[kind]?.ns !== 'site') return '';
+  if (clean === 'home' || clean.startsWith('landing-page/')) return '';
+  return `/${clean}`;
+}
+const isLive = (row) => /^published$/i.test(String(row?.status || ''));
+
 const isKind = (kind) => Object.prototype.hasOwnProperty.call(KINDS, kind);
 const kindOfModel = (modelName) => Object.keys(KINDS).find((kind) => KINDS[kind].model === modelName) || null;
 
@@ -57,7 +77,7 @@ let modelsCache = null;
 const models = () => (modelsCache ||= require('../models'));
 
 /** The first record of the same namespace (other than `id` of `kind`) that already uses `slug`, or null. */
-async function findConflict(kind, slug, { id = null, transaction = null } = {}) {
+async function findConflict(kind, slug, { id = null, transaction = null, ignoreTrashed = false } = {}) {
   const clean = normalizeSlug(slug);
   if (!clean || !isKind(kind)) return null;
   const { ns } = KINDS[kind];
@@ -72,7 +92,7 @@ async function findConflict(kind, slug, { id = null, transaction = null } = {}) 
     if (other === kind && id != null && id !== '') where.id = { [Op.ne]: id };
     const row = await Model.findOne({
       where,
-      paranoid: false,
+      paranoid: ignoreTrashed,
       attributes: ['id', 'slug', config.name, ...(Model.rawAttributes.deletedAt ? ['deletedAt'] : [])],
       transaction,
     });
@@ -121,6 +141,10 @@ async function checkSlug(kind, slug, options = {}) {
   if (reserved) return { slug: clean, available: false, reason: reserved, conflict: null, suggestion: await suggestSlug(kind, clean, options) };
   const conflict = await findConflict(kind, clean, options);
   if (!conflict) return { slug: clean, available: true, reason: '', conflict: null, suggestion: '' };
+  // A record in Trash gives its slug up when this one is saved (assertSlugFree).
+  if (conflict.trashed) {
+    return { slug: clean, available: true, reason: `Free: the ${conflict.label} "${conflict.name}" that used it is in Trash and gives it up when you save.`, conflict, suggestion: '' };
+  }
   return { slug: clean, available: false, reason: conflictMessage(clean, conflict), conflict, suggestion: await suggestSlug(kind, clean, options) };
 }
 
@@ -129,13 +153,43 @@ async function assertSlugFree(kind, slug, { id = null, transaction = null, allow
   const clean = normalizeSlug(slug);
   if (!clean || !isKind(kind)) return;
   const reserved = allowReserved ? '' : reservedReason(kind, clean);
-  const conflict = reserved ? null : await findConflict(kind, clean, { id, transaction });
+  let conflict = reserved ? null : await findConflict(kind, clean, { id, transaction });
+  if (!reserved && conflict?.trashed) {
+    await releaseTrashed(conflict, transaction);
+    conflict = await findConflict(kind, clean, { id, transaction });
+  }
   if (!reserved && !conflict) return;
   const err = new Error(reserved || conflictMessage(clean, conflict));
   err.status = 409;
   err.code = 'SLUG_TAKEN';
   err.errors = [{ field: 'slug', message: err.message }];
   throw err;
+}
+
+/** Gives up the plain slug of a row trashed before slugs were freed on delete. */
+async function releaseTrashed(conflict, transaction) {
+  const Model = models()[KINDS[conflict.type].model];
+  if (!Model) return;
+  await Model.update({ slug: trashedSlug(conflict.slug) }, { where: { id: conflict.id }, paranoid: false, hooks: false, validate: false, transaction });
+}
+
+/** Website menu items that link to `path` (header / footer …): [{ menu, title }]. */
+async function menuLinksTo(path, transaction) {
+  const clean = normalizeSlug(path);
+  if (!clean) return [];
+  const { MenuItem, Menu, Sequelize } = models();
+  if (!MenuItem) return [];
+  const { Op } = Sequelize;
+  const variants = [`/${clean}`, `/${clean}/`, clean, `${clean}/`];
+  const items = await MenuItem.findAll({
+    where: { [Op.or]: [{ url: { [Op.in]: variants } }, { url: { [Op.like]: `%taxalphonic.com/${clean}` } }, { url: { [Op.like]: `%taxalphonic.com/${clean}/` } }] },
+    attributes: ['id', 'title', 'menuId'],
+    transaction,
+  });
+  if (!items.length) return [];
+  const menus = Menu ? await Menu.findAll({ where: { id: [...new Set(items.map((i) => i.menuId))] }, attributes: ['id', 'name', 'location'], transaction }) : [];
+  const nameOf = (id) => { const m = menus.find((x) => x.id === id); return m ? (m.name || m.location || 'Menu') : 'Menu'; };
+  return items.map((i) => ({ menu: nameOf(i.menuId), title: i.title }));
 }
 
 let hooked = false;
@@ -158,8 +212,58 @@ function watchSlugs() {
       for (const row of rows) await assertSlugFree(kind, row.slug, { transaction: options?.transaction });
     });
     // Restoring is not a new URL choice: only a real clash blocks it, reserved words do not.
-    Model.addHook('beforeRestore', 'slugRegistry', (row, options) =>
-      assertSlugFree(kind, row.slug, { id: row.id, transaction: options?.transaction, allowReserved: true }));
+    // A row trashed with a freed slug gets its slug back in afterRestore (or "<slug>-2" if taken).
+    Model.addHook('beforeRestore', 'slugRegistry', (row, options) => (isTrashedSlug(row.slug) ? undefined
+      : assertSlugFree(kind, row.slug, { id: row.id, transaction: options?.transaction, allowReserved: true })));
+
+    // Bulk deletes / restores run the per-row hooks too.
+    Model.addHook('beforeBulkDestroy', 'slugRegistry', (options) => { options.individualHooks = true; });
+    Model.addHook('beforeBulkRestore', 'slugRegistry', (options) => { options.individualHooks = true; });
+
+    // A page linked in a website menu is not deleted: the menu link would lead nowhere.
+    if (KINDS[kind].ns === 'site') {
+      Model.addHook('beforeDestroy', 'slugRegistry', async (row, options) => {
+        if (isTrashedSlug(row.slug) || options?.skipMenuCheck) return;
+        const path = sitePath(kind, row.slug);
+        if (!path) return;
+        const links = await menuLinksTo(path, options?.transaction);
+        if (!links.length) return;
+        const where = links.slice(0, 5).map((l) => `${l.menu} › ${l.title}`).join(', ');
+        const err = new Error(`"${row.title || row.slug}" is linked in the website menu (${where}${links.length > 5 ? ', …' : ''}). Change or remove that menu link in Menus & Navigation first, then delete it.`);
+        err.status = 409;
+        err.code = 'MENU_LINKED';
+        err.errors = [{ field: 'menu', message: err.message }];
+        throw err;
+      });
+    }
+
+    // Deleted: the slug is freed (Trash) and a live page's path answers 410 on the website.
+    Model.addHook('afterDestroy', 'slugRegistry', async (row, options) => {
+      const transaction = options?.transaction;
+      const path = sitePath(kind, row.slug);
+      if (path && isLive(row)) await require('./goneUrls').addGone(path, { kind, title: row.title || row.name }, transaction);
+      if (!options?.force && Model.options?.paranoid && !isTrashedSlug(row.slug)) {
+        await Model.update({ slug: trashedSlug(row.slug) }, { where: { id: row.id }, paranoid: false, hooks: false, validate: false, transaction });
+      }
+    });
+
+    Model.addHook('afterRestore', 'slugRegistry', async (row, options) => {
+      const transaction = options?.transaction;
+      if (!isTrashedSlug(row.slug)) return;
+      const wanted = originalSlug(row.slug);
+      const taken = await findConflict(kind, wanted, { id: row.id, transaction, ignoreTrashed: true });
+      const slug = taken || reservedReason(kind, wanted) ? (await suggestSlug(kind, wanted, { id: row.id, transaction })) || `${wanted}-${Date.now().toString(36)}` : wanted;
+      await Model.update({ slug }, { where: { id: row.id }, paranoid: false, hooks: false, validate: false, transaction });
+      row.slug = slug;
+      if (isLive(row)) await require('./goneUrls').removeGone(sitePath(kind, slug), transaction);
+    });
+
+    // Live again at a path: it is no longer gone.
+    Model.addHook('afterSave', 'slugRegistry', async (row, options) => {
+      if (!isLive(row) || isTrashedSlug(row.slug)) return;
+      const path = sitePath(kind, row.slug);
+      if (path) await require('./goneUrls').removeGone(path, options?.transaction);
+    });
   }
 }
 
@@ -175,4 +279,8 @@ module.exports = {
   conflictMessage,
   kindOfModel,
   watchSlugs,
+  originalSlug,
+  isTrashedSlug,
+  sitePath,
+  menuLinksTo,
 };

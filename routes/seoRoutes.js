@@ -8,6 +8,16 @@ const { verifyToken, checkPermission } = require('../middlewares/auth');
 router.get('/lookup', SeoController.getByRoute);
 // Public: custom robots.txt for the website's /robots.txt ({ content: null } = automatic).
 router.get('/robots-txt/public', RobotsTxtController.getPublic);
+// Paths of deleted pages: the website answers them with 410 Gone (services/goneUrls.js, website proxy.js).
+router.get('/gone-urls', async (req, res) => {
+  try {
+    const paths = await require('../services/goneUrls').listGone();
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({ success: true, data: paths });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message, data: [] });
+  }
+});
 
 // Admin (SEO Management → SEO Configs)
 router.use(verifyToken);

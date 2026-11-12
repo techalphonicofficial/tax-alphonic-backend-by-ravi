@@ -1,3 +1,4 @@
+const { keepHeroBackground } = require('../utils/pseoHeroBg');
 const SeoPageService = require('../services/SeoPageService');
 const SectionHydrator = require('../services/SectionHydrator');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
@@ -540,7 +541,8 @@ class SeoPageController {
       // Mutate database object
       item.contentSource = 'AI';
       item.aiGenerationStatus = 'GENERATED';
-      item.longDescription = generated.rawOutput;
+      // The editor's hero background (data-bg-* on the hero section) survives the rewrite.
+      item.longDescription = keepHeroBackground(item.longDescription, generated.rawOutput);
       item.qualityScore = generated.qualityScore || 85;
       item.status = 'DRAFT'; // Left as DRAFT so an admin can canonicalize it structurally
 
@@ -597,7 +599,8 @@ class SeoPageController {
           });
           item.contentSource = 'AI';
           item.aiGenerationStatus = 'GENERATED';
-          item.longDescription = generated.rawOutput;
+          // The editor's hero background (data-bg-* on the hero section) survives the rewrite.
+      item.longDescription = keepHeroBackground(item.longDescription, generated.rawOutput);
           item.qualityScore = generated.qualityScore || 85;
 
           if (updateMetadata) {

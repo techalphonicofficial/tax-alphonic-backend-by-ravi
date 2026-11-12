@@ -1,3 +1,4 @@
+const { originalSlug } = require('../services/slugRegistry');
 const { Op } = require('sequelize');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const { logger } = require('../config/logger');
@@ -14,11 +15,11 @@ const { logger } = require('../config/logger');
  * inside a folder: they are restored or deleted with that folder).
  */
 const MODULES = {
-  services: { model: 'Service', label: 'Services', name: 'title', url: (r) => `/${r.slug}`, permission: 'Services' },
-  pages: { model: 'Page', label: 'Pages', name: 'title', url: (r) => (r.slug === 'home' ? '/' : `/${r.slug}`), permission: 'CMS' },
-  'seo-pages': { model: 'Seopage', label: 'SEO Pages', name: 'title', url: (r) => `/${r.slug}`, permission: 'SEO' },
+  services: { model: 'Service', label: 'Services', name: 'title', url: (r) => `/${originalSlug(r.slug)}`, permission: 'Services' },
+  pages: { model: 'Page', label: 'Pages', name: 'title', url: (r) => (originalSlug(r.slug) === 'home' ? '/' : `/${originalSlug(r.slug)}`), permission: 'CMS' },
+  'seo-pages': { model: 'Seopage', label: 'SEO Pages', name: 'title', url: (r) => `/${originalSlug(r.slug)}`, permission: 'SEO' },
   'seo-configs': { model: 'Seo', label: 'SEO Configs', name: (r) => r.targetLabel || r.route, url: (r) => r.route, permission: 'SEO' },
-  blogs: { model: 'Blog', label: 'Blogs', name: 'title', url: (r) => `/blog/${r.slug}`, permission: 'Blogs' },
+  blogs: { model: 'Blog', label: 'Blogs', name: 'title', url: (r) => `/blog/${originalSlug(r.slug)}`, permission: 'Blogs' },
   'service-categories': { model: 'ServiceCategory', label: 'Service Categories', name: 'name', url: (r) => r.slug, permission: 'Services' },
   forms: { model: 'Form', label: 'Forms', name: 'name', url: (r) => r.slug, permission: 'Forms' },
   menus: { model: 'Menu', label: 'Menus', name: 'name', url: (r) => r.location, permission: 'Menus' },

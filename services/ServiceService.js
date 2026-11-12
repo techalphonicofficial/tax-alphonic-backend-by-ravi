@@ -4,7 +4,7 @@ const { Service, ServiceSection, ServiceSectionData, SectionType } = require('..
 const ServiceRepository = require('../repositories/ServiceRepository');
 const AuditLogService = require('./AuditLogService');
 const { describeSectionChanges, summarizeSections, moduleLabel } = require('../utils/auditDescribe');
-const { copyFields, copyTitle, freeCopySlug } = require('./cloneRecord');
+const { copyFields, copyTitle, freeCopySlug, relinkCopy } = require('./cloneRecord');
 
 class ServiceService extends BaseService {
   constructor() {
@@ -79,10 +79,11 @@ class ServiceService extends BaseService {
       data: { payload: parse(sec.data?.payload, {}) },
     })).filter((sec) => sec.sectionTypeId);
 
+    const slug = await freeCopySlug('service', plain.slug);
     const copy = await this.create({
-      ...copyFields(plain, ['sections', 'featured']),
+      ...relinkCopy(copyFields(plain, ['sections', 'featured']), plain.slug, slug),
       title: copyTitle(plain.title),
-      slug: await freeCopySlug('service', plain.slug),
+      slug,
       status: 'draft',
       featured: false,
     });

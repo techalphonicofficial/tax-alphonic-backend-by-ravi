@@ -22,7 +22,15 @@ class BaseService {
 
     const where = {};
     for (const key in filters) {
-      if (key.endsWith('_like')) {
+      if (key.endsWith('_like') && key.includes('_or_')) {
+        // "title_or_slug_like=gst" → title LIKE %gst% OR slug LIKE %gst% (list search boxes).
+        // A pasted address ("https://site.com/gst/" or "/gst") is searched as its path.
+        const fields = key.slice(0, -'_like'.length).split('_or_').filter(Boolean);
+        const text = String(filters[key]).trim();
+        const path = text.replace(/^https?:\/\/[^/]+/i, '').replace(/^\/+|\/+$/g, '');
+        const ors = fields.map((field) => ({ [field]: { [Op.like]: `%${field === 'slug' ? path || text : text}%` } }));
+        where[Op.or] = [...(where[Op.or] || []), ...ors];
+      } else if (key.endsWith('_like')) {
         const field = key.replace('_like', '');
         where[field] = { [Op.like]: `%${filters[key]}%` };
       } else if (key.endsWith('_ne')) {

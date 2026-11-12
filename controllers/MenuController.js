@@ -72,6 +72,13 @@ class MenuController {
         if (!item) {
           return errorResponse(res, 'Menu item not found', [], 404);
         }
+        // The item already leads to another page: only replaced when the editor confirmed it.
+        const bareUrl = (value) => String(value || '').trim().replace(/\/+$/, '').toLowerCase();
+        const same = (a, b) => bareUrl(a) === bareUrl(b);
+        const current = String(item.url || '').trim();
+        if (current && current !== '#' && !same(current, url) && !req.body.confirmReplace) {
+          return errorResponse(res, `The menu item "${item.title}" already links to ${current}. Linking it here replaces that link.`, [{ code: 'MENU_ITEM_LINKED', url: current, title: item.title }], 409);
+        }
         item.url = url;
         if (title) item.title = title;
         await item.save();
@@ -85,6 +92,14 @@ class MenuController {
         const menu = await Menu.findByPk(menuId);
         if (!menu) {
           return errorResponse(res, 'Target menu not found', [], 404);
+        }
+
+        // The same link twice in one menu would show the page twice in the header / footer.
+        const { Op } = require('sequelize');
+        const bare = String(url).trim().replace(/\/+$/, '');
+        const existing = await MenuItem.findOne({ where: { menuId, url: { [Op.in]: [bare, `${bare}/`] } } });
+        if (existing && !req.body.confirmDuplicate) {
+          return errorResponse(res, `"${menu.name}" already has a link to ${bare} ("${existing.title}"). Adding it again shows it twice.`, [{ code: 'MENU_URL_EXISTS', title: existing.title }], 409);
         }
 
         const maxOrder = await MenuItem.max('displayOrder', {

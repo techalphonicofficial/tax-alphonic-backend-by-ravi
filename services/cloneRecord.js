@@ -41,4 +41,25 @@ function copyFields(source, extraDrop = []) {
   return Object.fromEntries(Object.entries(source || {}).filter(([key]) => !drop.has(key)));
 }
 
-module.exports = { copyTitle, copySlugCandidates, freeCopySlug, copyFields, NEVER_COPIED };
+/**
+ * The copy's own address in the texts that name the page (2026-11-12): the JSON-LD schema and the
+ * custom head tags pointed at the original URL, so the copy claimed to be the original page.
+ */
+function relinkCopy(fields, oldSlug, newSlug) {
+  const from = normalizeSlug(oldSlug);
+  const to = normalizeSlug(newSlug);
+  if (!from || !to || from === to) return fields;
+  const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`/${escaped}(?=["'/?#\\s<]|$)`, 'gi');
+  const out = { ...fields };
+  for (const key of ['schemaMarkup', 'otherTags']) {
+    const value = out[key];
+    if (typeof value === 'string' && value) out[key] = value.replace(re, `/${to}`);
+    else if (value && typeof value === 'object') {
+      try { out[key] = JSON.parse(JSON.stringify(value).replace(re, `/${to}`)); } catch { /* keep as it was */ }
+    }
+  }
+  return out;
+}
+
+module.exports = { copyTitle, copySlugCandidates, freeCopySlug, copyFields, relinkCopy, NEVER_COPIED };
